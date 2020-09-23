@@ -1,0 +1,15 @@
+<?php
+
+/**
+ * Implementation of hook_node_info
+ *
+ * @return unknown
+ */
+function ebook_node_info() {
+	$info = array();
+	$info['ebook'] = array(
+		'name' => t('EBook'),
+		'base' => 'node_content',
+	);
+	return $info;
+}
