@@ -4,75 +4,123 @@
  * @author Wang Xiaoli (creator)
  */
 
+/**
+ * Implementation of hook_menu()
+ */
+function entity_creator_menu() {
+  $items['userPage'] = array(
+    'title' => t('All Registered Users'),
+    'page callback' => 'entity_creator_callback',
+    'access callback' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'main-menu',
+    'weight' => 3,
+  );
+
+  return $items;
+}
+
+/**
+ * Page callback: displaying a page with php template
+ *
+ * @see entity_creator_menu()
+ */
+function entity_creator_callback(){
+  global $user;
+  $build = array();
+
+  $query = db_select('users', 'u');
+  $items = $query
+    ->fields('u', array('uid', 'name'))
+    ->condition('u.status', 1)
+    ->orderby('u.uid')
+    ->execute()
+    ->fetchAll();
+
+  if (!empty($items)) {
+    $html = '<ul>';
+    foreach($items as $item) {
+      $html .= '<li><a href="' . url("user/{$item->uid}")  . '"  class="username">' . $item->name . '</a>' . '' . '</li>' ;
+    }
+    $html .= '</ul>';
+    $build =  $html;
+  }
+  else {
+    drupal_set_message(t('No user exists.'));
+  }
+
+  return $build;
+}
+
 function entity_creator_create_users() {
-	$max_num = 10; // The total number of users
-	$i = 1;
-	while($i < $max_num) {
-		$name = 'guest' . $i;
-		if ($error = user_validate_name($name)) {
-	      	$i++;
-	      	$max_num++;
-	      	continue;
-	    }
-	    
-	    // If the user exists
-	    if((bool)db_select('users')
-		    ->fields('users', array('uid'))
-		    ->condition('name', db_like($name), 'LIKE')
-		    ->range(0, 1)
-		    ->execute()
-		    ->fetchField()) {
-	    	$i++;
-	      	$max_num++;
-	      	continue;
-	    }
-		
-		// Register this new user
-		$pass = $name;
-		$mail = $name . '@test.com';
-		$userinfo = array(
-			'name' => $name,
-			'pass' => $pass,
-			'init' => $mail,
-			'mail' => $mail,
-			'status' => 1,
-			'access' => REQUEST_TIME,
-		);			
-		$account = user_save(drupal_anonymous_user(), $userinfo);
-		if ($account && isset($account->uid)) {
-		    // Create related nodes for this user
-			entity_creator_create_nodes($account);
-		}
-		else {
-			$max_num++;
-		}
-		$i++;
-	}
+  $max_num = 10; // The total number of users
+  $i = 1;
+  while($i < $max_num) {
+    $name = 'guest' . $i;
+    if ($error = user_validate_name($name)) {
+          $i++;
+          $max_num++;
+          continue;
+      }
+
+      // If the user exists
+      if((bool)db_select('users')
+        ->fields('users', array('uid'))
+        ->condition('name', db_like($name), 'LIKE')
+        ->range(0, 1)
+        ->execute()
+        ->fetchField()) {
+        $i++;
+          $max_num++;
+          continue;
+      }
+
+    // Register this new user
+    $pass = $name;
+    $mail = $name . '@test.com';
+    $userinfo = array(
+      'name' => $name,
+      'pass' => $pass,
+      'init' => $mail,
+      'mail' => $mail,
+      'status' => 1,
+      'access' => REQUEST_TIME,
+    );
+    $account = user_save(drupal_anonymous_user(), $userinfo);
+    if ($account && isset($account->uid)) {
+        // Create related nodes for this user
+      entity_creator_create_nodes($account);
+    }
+    else {
+      $max_num++;
+    }
+    $i++;
+  }
 }
 function entity_creator_create_nodes($account) {
-	$title = 'Your title';
-	$type = 'blog';
-	$body = 'Your content';
-	
-	$node_info = array(
-		  'uid' 	  => $account->uid,
-	      'title'     => check_plain($title),
-	      'comment'   => variable_get('comment_' . $type, COMMENT_NODE_OPEN),
-		  'comment_count' => '',
-	      'moderate'  => 0,
-	      'promote'   => 1,
-	      'revision'  => 1,
-	      'log'       => '',
-	      'status'    => 1,
-	      'sticky'    => 0,
-	      'type'      => $type,
-	      'revisions' => NULL,
-	      'language'  => LANGUAGE_NONE,
-	);
-	$node_info['body'][LANGUAGE_NONE][0] = array('value' => $body, 'format' => 'filtered_html');
-	
-	$node = (object)$node_info;
-	node_submit($node);
-	node_save($node);
+  $title = 'Your title';
+  $type = 'blog';
+  $body = 'Your content';
+
+  $node_info = array(
+      'uid'     => $account->uid,
+        'title'     => check_plain($title),
+        'comment'   => variable_get('comment_' . $type, COMMENT_NODE_OPEN),
+      'comment_count' => '',
+        'moderate'  => 0,
+        'promote'   => 1,
+        'revision'  => 1,
+        'log'       => '',
+        'status'    => 1,
+        'sticky'    => 0,
+        'type'      => $type,
+        'revisions' => NULL,
+        'language'  => LANGUAGE_NONE,
+  );
+  $node_info['body'][LANGUAGE_NONE][0] = array('value' => $body, 'format' => 'filtered_html');
+
+  $node = (object)$node_info;
+  node_submit($node);
+  node_save($node);
 }
 

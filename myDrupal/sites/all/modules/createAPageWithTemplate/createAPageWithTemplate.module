@@ -22,7 +22,7 @@ function createAPageWithTemplate_menu() {
 
 /**
  * Page callback: displaying a page with php template
- *  
+ *
  * @see createAPageWithTemplate_menu()
  */
 function a_new_page_callback(){
@@ -54,4 +54,14 @@ function a_new_page_callback(){
   }
 
 	return $build;
+}
+
+
+/**
+ * User login: alert when a user logins in
+ *
+ * @see createAPageWithTemplate_menu()
+ */
+function createAPageWithTemplate_user_login(&$edit, $account) {
+  drupal_set_message(t("Enter the new module function!!"), 'warning');
 }

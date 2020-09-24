@@ -10,7 +10,7 @@
  */
 function friend_recommendation_block_info() {
   global $user;
-  
+
   $blocks['people_you_may_know'] = array (
 		'info' => t('People You May Know'),
 		'cache' => DRUPAL_NO_CACHE,
@@ -41,11 +41,13 @@ function friend_recommendation_block_view($delta = '') {
 		->range(0, 5)
 		->execute()
 		->fetchAll();
-		
+
 		if (count($items)!==0) {
 		    $html = '<ul>';
 		    foreach($items as $item) {
+          $addFriendbtn = '<a href="' . url("relationship/{$item->uid}/request", array('query' => array('destination' => $_GET['q']))) . '" class="button">Add Friend</a>';
 		      $html .= '<li><a href="' . url("user/{$item->uid}")  . '"  class="username">' . $item->name . '</a>' . '' . '</li>' ;
+          $html .= $addFriendbtn;
 		    }
 		    $html .= '</ul>';
 			$block['subject'] = t('People You May Know');
