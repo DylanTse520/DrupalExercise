@@ -35,6 +35,6 @@ function file_node_uninstall() {
   		field_delete_instance($instance);
   	}
 
-  	node_type_delete('ebook');  	
+  	node_type_delete('ebook');
   	field_purge_batch(1000);
 }
