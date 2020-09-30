@@ -1639,3 +1639,15 @@ div.admin-panel .description {
 #footer-wrapper .poll .bar .foreground {
   background-color: #ddd;
 }
+
+.node-ebook.node-full {
+  float: left;;
+  width: 68%;
+}
+
+.annotation-ebook-wrapper {
+  float: left;
+  width: 30%;
+  margin-top: 30px;
+  margin-left: 10px;
+}

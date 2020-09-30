@@ -10,6 +10,7 @@ function ebook_node_info() {
 	$info['ebook'] = array(
 		'name' => t('EBook'),
 		'base' => 'node_content',
+		'description' => t('Use for ebook. Every user can upload and view a book.'),
 	);
 	return $info;
 }
@@ -18,41 +19,31 @@ function ebook_node_info() {
  * Implementation of hook_menu()
  */
 function ebook_menu() {
-  $items['allEBookPage'] = array(
-    'title' => t('All EBooks'),
-    'page callback' => 'all_ebook_callback',
-    'access callback' => TRUE,
+  $items['mylibrary'] = array(
+    'title' => t('My Library'),
+    'page callback' => 'mylibrary_page_callback',
+    'access arguments' => array('access content'),
     'type' => MENU_NORMAL_ITEM,
-    'menu_name' => 'main-menu',
-    'weight' => 4,
+    'menu_name' => 'user-menu',
+    'weight' => -5,
   );
-  $items['myEBookPage'] = array(
-    'title' => t('My EBooks'),
-    'page callback' => 'my_ebook_callback',
-    'access callback' => TRUE,
-    'type' => MENU_NORMAL_ITEM,
-    'menu_name' => 'main-menu',
-    'weight' => 4,
-  );
+
   return $items;
 }
 
-
-/**
- * Page callback: displaying a page with php template
- *
- * @see ebook_menu()
- */
-function all_ebook_callback(){
+function mylibrary_page_callback(){
   global $user;
   $build = array();
 
   $query = db_select('node', 'n')->extend('PagerDefault');
   $nids = $query
-    ->fields('n', array('nid', 'title'))
+    ->fields('n', array('nid', 'created'))
     ->condition('type', 'ebook')
+    ->condition('uid', $user->uid)  //books uploaded by the current user
     ->condition('status', 1)
-    ->orderBy('nid', 'DESC')
+    ->orderBy('created', 'DESC')
+    ->limit(variable_get('default_nodes_main', 10))
+    ->addTag('node_access')
     ->execute()
     ->fetchCol();
 
@@ -65,45 +56,8 @@ function all_ebook_callback(){
     );
   }
   else {
-    drupal_set_message(t('No ebook has been created.'));
+    drupal_set_message(t('No book entries have been created.'));
   }
 
   return $build;
 }
-
-
-/**
- * Page callback: displaying a page with php template
- *
- * @see ebook_menu()
- */
-function my_ebook_callback(){
-  global $user;
-  $uid = $user->uid;
-  $build = array();
-
-  $query = db_select('node', 'n')->extend('PagerDefault');
-  $nids = $query
-    ->fields('n', array('nid', 'title'))
-    ->condition('type', 'ebook')
-    ->condition('status', 1)
-    ->condition('uid', $uid, '=')
-    ->orderBy('nid', 'DESC')
-    ->execute()
-    ->fetchCol();
-
-  if (!empty($nids)) {
-    $nodes = node_load_multiple($nids);
-    $build += node_view_multiple($nodes);
-    $build['pager'] = array(
-      '#theme' => 'pager',
-      '#weight' => 5,
-    );
-  }
-  else {
-    drupal_set_message(t('No ebook has been created by you.'));
-  }
-
-  return $build;
-}
-

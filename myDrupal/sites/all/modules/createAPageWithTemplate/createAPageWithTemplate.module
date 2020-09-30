@@ -8,14 +8,12 @@
  * Implementation of hook_menu()
  */
 function createAPageWithTemplate_menu() {
-  $items['aNewPage'] = array(
-    'title' => t('A New Page for Testing'),
-    'page callback' => 'a_new_page_callback',
-    'access callback' => TRUE,
-    'type' => MENU_NORMAL_ITEM,
-    'menu_name' => 'main-menu',
-    'weight' => 5,
-  );
+	$items['aNewPage'] = array(
+		'access callback' => 'user_access', // change the callback for the access control
+    'access arguments' => array('user_is_logged_in'),
+	 	'page callback' 	=> 'a_new_page_callback',
+    'type' => MENU_CALLBACK,
+	);
 
 	return $items;
 }
@@ -26,8 +24,18 @@ function createAPageWithTemplate_menu() {
  * @see createAPageWithTemplate_menu()
  */
 function a_new_page_callback(){
+  drupal_add_css(drupal_get_path('module', 'createAPageWithTemplate') . '/css/anewpage.css');
+
   global $user;
   $build = array();
+
+  $result1 = db_query("SELECT uid, name FROM {users}");
+  $result2 = db_select('users', 'u')->fields('u', array('uid', 'name'))->execute();
+  $record = $result1->fetchAll();
+  var_dump($record);
+  $record = $result2->fetchAll();
+  var_dump($record);
+
 
   $query = db_select('node', 'n')->extend('PagerDefault');
   $nids = $query
@@ -53,15 +61,35 @@ function a_new_page_callback(){
     drupal_set_message(t('No blog entries have been created.'));
   }
 
-	return $build;
+  $title = t("A New Page for Testing");
+	$variables = array('title' => $title, 'contents' => drupal_render($build));
+	return theme('a_testing_page', $variables);
 }
 
+/**
+ * Implements hook_theme().
+ */
+function createAPageWithTemplate_theme() {
+  return array(
+    'a_testing_page' => array(
+      'variables' => array('title' => NULL, 'contents' => NULL),
+      'template' => 'a-testing-page',
+    ),
+  );
+}
 
 /**
- * User login: alert when a user logins in
+ * Processes variables for book-export-html.tpl.php.
  *
- * @see createAPageWithTemplate_menu()
+ * @param $variables
+ *   An associative array containing the following keys:
+ *   - title
+ *   - contents
+ *
+ * @see a-testing-page.tpl.php
  */
-function createAPageWithTemplate_user_login(&$edit, $account) {
-  drupal_set_message(t("Enter the new module function!!"), 'warning');
+function template_preprocess_a_testing_page(&$variables) {
+  $variables['title'] = check_plain($variables['title']);
+  $imgpath = drupal_get_path('module', 'createAPageWithTemplate') . '/css/bd_logo1.png';
+  $variables['logo'] = file_create_url($imgpath);
 }

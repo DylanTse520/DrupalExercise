@@ -1,1 +1,0 @@
-$addFriendbtn = '<a href="' . url("relationship/{$item->uid}/request", array('query' => array('destination' => $_GET['q']))) . '" class="button">Add Friend</a>';
