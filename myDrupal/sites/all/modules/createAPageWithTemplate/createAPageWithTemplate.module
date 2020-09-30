@@ -29,11 +29,8 @@ function a_new_page_callback(){
   global $user;
   $build = array();
 
-  $result1 = db_query("SELECT uid, name FROM {users}");
-  $result2 = db_select('users', 'u')->fields('u', array('uid', 'name'))->execute();
-  $record = $result1->fetchAll();
-  var_dump($record);
-  $record = $result2->fetchAll();
+  $result = db_select('users', 'u')->fields('u', array('uid', 'name'))->execute();
+  $record = $result->rowCount();
   var_dump($record);
 
 
