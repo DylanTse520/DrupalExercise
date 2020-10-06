@@ -1,0 +1,159 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function annotation_install() {
+	//Updates the database cache of node types
+	node_types_rebuild();
+	$types = node_type_get_types();
+	// add the body field to the node type
+	$body_instance = node_add_body_field($types['annotation']);
+
+	// create annotation basic fields and instances
+	foreach (_annotation_controlled_fields() as $field) {
+		_annotation_ensure_field($field);
+	}
+	
+	foreach (_annotation_controlled_instances() as $instance) {
+		$instance['entity_type'] = 'node';
+    	$instance['bundle'] = 'annotation';
+    	_annotation_ensure_instance($instance);
+  	}
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function annotation_uninstall() {
+	$nids = db_query('SELECT nid FROM {node} n WHERE n.type = :type', array(':type' => 'annotation'))->fetchCol();
+
+	$i = 0;
+	while( $i*100 < count($nids) ) {
+		$slices = array_slice($nids, $i * 100, 100);
+		$i++;
+		node_delete_multiple($slices);
+	}
+
+	// delete field instances
+	$instances = field_info_instances('node', 'annotation');
+  	foreach ($instances as $instance_name => $instance) {
+  		field_delete_instance($instance);
+  	}
+  	
+	foreach(array_keys(_annotation_controlled_fields()) as $field) {
+		$existing_field = field_read_field($field);
+		if ($existing_field) {
+			field_delete_field($field);
+		}
+	}
+	
+
+  	node_type_delete('annotation');  	
+  	field_purge_batch(1000);
+}
+
+/**
+ * Implements hook_schema().
+ */
+function annotation_schema() {
+  $schema['ebook_annotations'] = array(
+    'fields' => array(
+      'book_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'annotation_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'highlight_start' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => NULL),
+      'highlight_end' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => NULL),
+    ),
+    'primary key' => array('book_nid','annotation_nid'),
+    'foreign keys' => array(
+    	'book_nid' => array(
+        	'table' => 'node',
+        	'columns' => array('book_nid' => 'nid'),
+		),
+		'annotation_nid' => array(
+        	'table' => 'node',
+        	'columns' => array('annotation_nid' => 'nid'),
+		),
+	),
+    'indexes' => array(
+      'bookAnnotations' => array('book_nid', 'annotation_nid'),
+      'book_nid' => array('book_nid'),
+      'annotation_nid' => array('annotation_nid'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Define the fields for our content type.
+ *
+ * This big array is factored into this function for readability.
+ *
+ * @return
+ *  An associative array specifying the fields add to the new node type.
+ */
+function _annotation_controlled_fields() {
+	return array(
+		'annotation_image' => array(
+			'field_name' => 'annotation_image',
+			'type'       => 'image',
+		),
+	);
+}
+
+/**
+ * Define the field instances for the new content type.
+ * @return
+ *  An associative array specifying the instances.
+ */
+function _annotation_controlled_instances() {
+	return array(
+		'annotation_image' => array(
+		    'field_name' => 'annotation_image',
+		    'label' => t('Image'),
+		    'description' => t('Upload an image.'),
+			'settings' => array(
+				'file_extensions' => 'png jpg jpeg',
+				'max_filesize' => '5MB',
+			),
+		    'widget' => array(
+				'weight' => 5,
+		    ),
+		    'display' => array(
+				'default' => array(
+				  'label' => 'hidden',
+		          'type' => 'image',
+		          'settings' => array(
+					'image_style' => 'thumbnail',
+					'image_link' => 'content',
+				  ),
+				),
+		        'teaser' => array(
+		          'label' => 'hidden',
+		          'type' => 'image',
+		          'settings' => array(
+					'image_style' => 'thumbnail',
+					'image_link' => 'content',
+				  ),
+		        ),
+		    ),
+		),
+	);
+}
+
+function _annotation_ensure_field($field) {
+	$existing_field = field_read_field($field['field_name'], array('include_inactive' => TRUE));
+	if (empty($existing_field)) {
+		field_create_field($field);
+	}
+}
+
+function _annotation_ensure_instance($instance) {
+	$existing_instance = field_info_instance($instance['entity_type'], $instance['field_name'], $instance['bundle']);
+	$existing_field = field_read_field($instance['field_name']);
+	if ($existing_field && empty($existing_instance)) {
+    	field_create_instance($instance);
+	}
+}
+

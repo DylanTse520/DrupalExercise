@@ -1,0 +1,322 @@
+<?php
+
+/**
+ * Implementation of hook_node_info
+ *
+ * @return unknown
+ */
+function annotation_node_info() {
+	$info = array();
+	$info['annotation'] = array(
+		'name' => t('Annotation'),
+		'base' => 'node_content',
+		'description' => t('Use for ebook. Every user can make annotations for ebook.'),
+	);
+	return $info;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function annotation_menu(){
+  $items['ajax/annotation'] = array(
+    'page callback' => 'annotation_ajax_callback',
+    'access callback' => 'user_is_logged_in',
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function annotation_block_info() {
+  global $user;
+
+  $blocks['annotation_block'] = array (
+    'info' => t('Annotaions'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['annotation_block']['properties']['administrative'] = TRUE;
+
+  $blocks['annotation_postbox'] = array (
+    'info' => t('Post annotaions'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['annotation_postbox']['properties']['administrative'] = TRUE;
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function annotation_block_view($delta = '') {
+  global $user;
+
+  $block = array();
+
+  if ($delta == 'annotation_block') {
+      if (user_access('access content')) {
+        // Perform database queries to get annotations.
+        $query = db_select('node', 'n')->extend('PagerDefault');
+        $nids = $query
+          ->fields('n', array('nid', 'created'))
+          ->condition('type', 'annotation')
+          ->condition('status', 1)
+          ->orderBy('created', 'DESC')
+          ->limit(variable_get('default_nodes_main', 10))
+          ->addTag('node_access')
+          ->execute()
+          ->fetchCol();
+
+        if (!empty($nids)) {
+          $build = array();
+          $nodes = node_load_multiple($nids);
+          $build += node_view_multiple($nodes, 'teaser');
+          $build['pager'] = array(
+            '#theme' => 'pager',
+            '#weight' => 5,
+          );
+          $block['subject'] = t('Annotations');
+          $block['content'] =  $build;
+        }
+    }
+  }
+  elseif ($delta == 'annotation_postbox') {
+      if (user_access('access content')) {
+        $type = arg(0);
+        $nid = arg(1);
+        if ( $type!=='node' || !is_numeric($nid) )
+          return;
+        $book = node_load($nid);
+        if ($book) {
+          // The attach info
+          $path = drupal_get_path('module', 'annotation');
+          $attached['css'][] = $path . '/css/postbox.css';
+          $attached['js'][] = $path . '/js/annotation.js';
+          $attached['js'][] = array(
+            'type' => 'setting',
+            'data' =>array(
+              'annotation' => array(
+                'timeout' => variable_get('annotation_timeout', 60),
+                'ajax_url' => url('ajax/annotation', array('absolute'=>TRUE)),
+                'annotation_bid' => $nid,
+              ),
+            )
+          );
+
+          // share image
+          $image_uploader_form = drupal_get_form('annotation_image_uploader_form');
+          $image_uploader = drupal_render($image_uploader_form);
+
+          $block['subject'] = t('Post annotations');
+          $block['content'] = array(
+            '#theme' => 'annotation_postbox_block',
+            '#attached' => $attached,
+            '#image_uploader' => isset($image_uploader) ? $image_uploader : NULL,
+          );
+        }
+      }
+  }
+
+  return $block;
+}
+
+/**
+ * Implements hook_theme()
+ */
+function annotation_theme(){
+  return array(
+    'annotation_postbox_block' => array(
+      'variables' => array(
+        'image_uploader'=>NULL),
+      'template' => 'annotation-postbox-block',
+    ),
+    'annotation_image_uploader_preview' => array(
+          'render element' => 'element',
+    ),
+  );
+}
+
+/**
+ * The image uploader callback.
+ */
+function annotation_image_uploader_form($form, &$form_state) {
+  $validators = array(
+      'file_validate_extensions' => variable_get('annotation_image_extensions', array('png jpg jpeg')),
+      'file_validate_size' => variable_get('annotation_file_max_size', array(file_upload_max_size())),
+  );
+
+  global $user;
+  $form['#validators'] = $validators;
+  $form['fid'] = array(
+      '#title' => t('Select a file from your computer'),
+      '#type' => 'managed_file',
+      '#description' => theme('file_upload_help', array('description' => '', 'upload_validators' => $validators)),
+      '#upload_location' => 'public://users/' . $user->uid . '/images',
+      '#upload_validators' => $validators,
+      '#progress_message' => t('Uploading file, please wait...'),
+      '#theme' => 'annotation_image_uploader_preview',
+  );
+
+  if (!empty($form_state['values']['fid'])) {
+    if($file = file_load($form_state['values']['fid'])) {
+      if (isset($file->type)) {
+        $file->type = FILE_TYPE_IMAGE;
+        file_save($file);
+      }
+    }
+  }
+
+  return $form;
+}
+
+/**
+ * Returns HTML for a managed file element with thumbnail.
+ */
+function theme_annotation_image_uploader_preview($variables) {
+  $element = $variables['element'];
+  $base = drupal_render_children($element); // renders element as usual
+  $output = '';
+  if($element['fid']['#value'] != 0) {
+      // if image is uploaded show its thumbnail to the output HTML
+    if($file = file_load($element['fid']['#value'])) {
+        $output .= '<div>' . theme('image_style', array('style_name' => 'medium', 'path' => $file->uri, 'getsize' => FALSE)) . '</div>';
+      $output .= '<script type="text/javascript">attach_media_upload("file", "' . $file->fid . '");</script>';
+    }
+  }
+  return $output.$base;
+}
+
+/**
+ * Ajax callback function for annotation.
+ */
+function annotation_ajax_callback(){
+  $act = isset($_REQUEST['act']) ? $_REQUEST['act'] : '';
+  $ret = array('error' => 'The request had bad syntax or was inherently impossible to be satisfied.');
+
+  switch( $act ){
+    case 'publish':
+      if (isset($_REQUEST['msg']) && !empty($_REQUEST['msg'])) {
+        // Save the annotation
+        $annotation = _annotation_save_annotation($_REQUEST['msg']);
+        if (!isset($annotation->nid))
+          break;
+
+        $new_node = node_load($annotation->nid);
+        $new_object = node_view($new_node);
+        $ret = array('success' => t('Annotation post sucesssfully!'), 'annotation'=>$new_object);
+      }
+      break;
+    default:
+      break;
+  }
+
+  if( isset($ret) )
+  die(drupal_json_encode($ret));
+}
+
+/**
+ * ajax callback for posting new annotation
+ */
+function _annotation_save_annotation($body='') {
+  if (empty($body))
+  return FALSE;
+
+  global $user;
+  $node = new stdClass();
+  $node->type = 'annotation';
+  $node->status = 1;
+  $node->uid = $user->uid;
+  $node->title = t('Annotation');
+  $node->promote = 1;
+  $node->sticky = 0;
+  $node->language = LANGUAGE_NONE;
+  $node->revision = NULL;
+  $node->comment = COMMENT_NODE_CLOSED;
+  $node->body[$node->language][0]['value'] = check_markup($body, 'filtered_html');
+  $node->body[$node->language][0]['format'] = 'filtered_html';
+
+  $attach_file = NULL;
+  $attach = (isset($_REQUEST['attach']) && !empty($_REQUEST['attach']))?$_REQUEST['attach']:NULL;
+  if ($attach) {
+    if (isset($attach['type']) && $attach['type'] == 'file' ) {
+      $attach_file = annotation_save_attachment_file($attach['id']);
+      if (isset($attach_file))
+        $node->annotation_image[$node->language][0] = array(
+          'annotation_image_fid' => $attach_file->fid,
+        );
+    }
+    if (isset($attach['type']) && $attach['type'] == 'image' ) {
+      $url = $attach['url'];
+      $directory = file_build_uri('/users/' . $user->uid . '/images');
+      if (!file_prepare_directory($directory, FILE_CREATE_DIRECTORY)) {
+        // If our directory doesn't exist and can't be created, use the default.
+        $directory = NULL;
+      }
+      $attach_file = system_retrieve_file($url, $directory, TRUE);
+      if (isset($attach_file))
+        $node->annotation_image[$node->language][0] = array(
+          'annotation_image_fid' => $attach_file->fid,
+        );
+    }
+  }
+
+  node_submit($node);
+  node_save($node);
+
+  if ($node->nid) {
+    if (isset($attach_file))
+      file_usage_add($attach_file, 'file', 'node', $node->nid);
+
+    $bid = $_REQUEST['book_id'];
+    $start = (isset($_REQUEST['start'])&&is_numeric($_REQUEST['start'])) ? $_REQUEST['start'] : NULL;
+    $end = (isset($_REQUEST['end'])&&is_numeric($_REQUEST['end'])) ? $_REQUEST['end'] : NULL;
+    db_merge('ebook_annotations')
+    ->key(array('book_nid' => $bid,'annotation_nid'=>$node->nid))
+    ->fields(array(
+      'highlight_start' => $start,
+      'highlight_end' => $end,
+    ))
+    ->execute();
+
+    if (isset($attach_file)) {
+      db_merge('field_data_annotation_image')
+      ->key(array(
+        'entity_id' => $node->nid,
+        'revision_id' => $node->nid,
+        'annotation_image_fid'=>$attach_file->fid
+      ))
+      ->fields(array(
+        'entity_type' => 'node',
+        'bundle' => 'annotation',
+        'deleted' => 0,
+        'language' => 'und',
+        'delta' => 0,
+      ))
+      ->execute();
+    }
+  }
+
+  return $node;
+}
+
+/**
+ * Set the attach file to be permanent status.
+ */
+function annotation_save_attachment_file($id) {
+  if ($file = file_load($id)) {
+    // Set the file permanent status
+    $file->status = FILE_STATUS_PERMANENT;
+    $file = file_save($file);
+    drupal_chmod($file->uri);
+
+    return $file;
+  }
+
+  return FALSE;
+}
+

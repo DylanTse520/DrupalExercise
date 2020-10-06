@@ -1,0 +1,11 @@
+name = Book Annotation
+description = Provide the annotation interface for ebooks.
+
+dependencies[] = ebook
+
+core = 7.x
+version = 7.x-20200924
+author = Wang Xiaoli
+
+package = Ebook
+project = Ebook
