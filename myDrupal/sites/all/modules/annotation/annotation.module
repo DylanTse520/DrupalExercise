@@ -62,10 +62,12 @@ function annotation_block_view($delta = '') {
       if (user_access('access content')) {
         // Perform database queries to get annotations.
         $query = db_select('node', 'n')->extend('PagerDefault');
+        $query->join('ebook_annotations', 'e', 'n.nid = e.annotation_nid');
         $nids = $query
           ->fields('n', array('nid', 'created'))
-          ->condition('type', 'annotation')
-          ->condition('status', 1)
+          ->condition('n.type', 'annotation')
+          ->condition('n.status', 1)
+          ->condition('e.book_nid', arg(1))
           ->orderBy('created', 'DESC')
           ->limit(variable_get('default_nodes_main', 10))
           ->addTag('node_access')
