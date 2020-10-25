@@ -56,27 +56,29 @@ function annotation_uninstall() {
 /**
  * Implements hook_schema().
  */
+// @TODO Define the offsets of the start node and end node for highlighting
 function annotation_schema() {
   $schema['ebook_annotations'] = array(
     'fields' => array(
-      'book_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'annotation_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'book_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'page_id' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => NULL),
       'highlight_start' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => NULL),
       'highlight_end' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => NULL),
     ),
-    'primary key' => array('book_nid','annotation_nid'),
+    'primary key' => array('annotation_nid'),
     'foreign keys' => array(
-    	'book_nid' => array(
-        	'table' => 'node',
-        	'columns' => array('book_nid' => 'nid'),
-		),
 		'annotation_nid' => array(
         	'table' => 'node',
         	'columns' => array('annotation_nid' => 'nid'),
 		),
+		'book_nid' => array(
+        	'table' => 'node',
+        	'columns' => array('book_nid' => 'nid'),
+		),
 	),
     'indexes' => array(
-      'bookAnnotations' => array('book_nid', 'annotation_nid'),
+      'book_page' => array('book_nid', 'page_id'),
       'book_nid' => array('book_nid'),
       'annotation_nid' => array('annotation_nid'),
     ),
