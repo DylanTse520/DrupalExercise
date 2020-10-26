@@ -33,7 +33,9 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 		// Define the click action for image attaching button
 		// When users click the image button, call the openDialog() function
 		$('.postbox .toolbar a.toolbar-btn').click(openDialog);
-
+		$('body').click(function(){
+			$('svg').remove()
+		})
 		// Add the highlighting functions here
 		$("#viewerContainer #viewer").mouseup(function(event){
  	    	if (window.getSelection){// For standard browsers: Chrome, Firefox...
@@ -115,8 +117,9 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 									var focus_node = page_container.children("div").eq(json.highlight.highlight_end);
 								}
 								var line = '<path d="M ' + ($(that).offset().left) + ' ' + ($(that).offset().top + 80) + ' '
+																	+ 'L ' + (focus_node.offset().left) + ' ' + ($(that).offset().top + 80) + ' '
 																	+ 'L ' + (focus_node.offset().left) + ' ' + (focus_node.offset().top) + ' '
-																	+ '" fill="transparent" stroke="black"></path>';
+																	+ '" fill="transparent" stroke="rgba(119, 118, 254, 0.5)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round""></path>';
 								var svg = '<svg version="1.1" baseProfile="full" width="' + $('#page-wrapper').width()
 													+ '" height="' + $('#page-wrapper').height()
 													+ '" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none; position: absolute; top: 0;">'
