@@ -19,10 +19,10 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 }
 
 (function($){
-	// When the documet is ready
+	// When the document is ready
 	$(function() {
 		// Define the click action for publish button
-		// When uers click the publish button, call the publish() function
+		// When users click the publish button, call the publish() function
 		$('#postbox .btn-publish').click(publish);
 		$('#postbox .post-btn').css({"font-size":"100%", "padding":"0px 5px", "margin-right":"3px"});
 		$('#postbox .post-btn').hover(function(){
@@ -31,7 +31,7 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 			$(this).css({"background-color":"gray"});
 		})
 		// Define the click action for image attaching button
-		// When uers click the image button, call the openDialog() function
+		// When users click the image button, call the openDialog() function
 		$('.postbox .toolbar a.toolbar-btn').click(openDialog);
 
 		// Add the highlighting functions here
@@ -45,7 +45,7 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
             		if (startNode && endNode) {
             			var start_index = $(startNode).index(); // Get Start selected node
             			var end_index = $(endNode).index(); // Get Last selected node
-            			if (end_index <= start_index) {
+            			if (end_index < start_index) {
             				alert("Error happened in javascript. Please try again later.");
             				return false;
             			}
@@ -117,8 +117,8 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 								var line = '<path d="M ' + ($(that).offset().left) + ' ' + ($(that).offset().top + 80) + ' '
 																	+ 'L ' + (focus_node.offset().left) + ' ' + (focus_node.offset().top) + ' '
 																	+ '" fill="transparent" stroke="black"></path>';
-								var svg = '<svg version="1.1" baseProfile="full" width="' + $('html').width()
-													+ '" height="' + $('html').height()
+								var svg = '<svg version="1.1" baseProfile="full" width="' + $('#page-wrapper').width()
+													+ '" height="' + $('#page-wrapper').height()
 													+ '" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none; position: absolute; top: 0;">'
 													+ line + '</svg>';
 								$(svg).appendTo($('body'));
@@ -175,7 +175,7 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 
 		if( !dialog.is(':visible') ) {
 			var content = $('#image-dialog');
-			// Check the existense of the image upload dialog
+			// Check the existence of the image upload dialog
 			if( content.length == 0 ) {
 				content = create_image_dialog();
 				content.addClass('dialog');
