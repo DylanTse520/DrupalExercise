@@ -6,6 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import xlwt
 import jieba.analyse
+import os
 
 # 先调用无界面浏览器PhantomJS或Firefox
 # driver = webdriver.PhantomJS()
@@ -74,12 +75,8 @@ def GetSearchContent(key):
     item_inp.send_keys(Keys.RETURN)  # 采用点击回车直接搜索
 
     time.sleep(5)
-    global sheet
 
-    sheet = outfile.add_sheet(key)
-    initXLS()
-
-    handlePage()  # 处理当前页面内容
+    handlePage(key)  # 处理当前页面内容
 
 
 
@@ -90,7 +87,7 @@ def GetSearchContent(key):
 # ********************************************************************************
 
 # 页面加载完成后，对页面内容进行处理
-def handlePage():
+def handlePage(key):
     # while True:
         # 之前认为可能需要sleep等待页面加载，后来发现程序执行会等待页面加载完毕
         # sleep的原因是对付微博的反爬虫机制，抓取太快可能会判定为机器人，需要输入验证码
@@ -98,7 +95,7 @@ def handlePage():
     # 先行判定是否有内容
     if checkContent():
         print("getContent")
-        getContent()
+        getContent(key)
         # 先行判定是否有下一页按钮
         # if checkNext():
         #     # 拿到下一页按钮
@@ -145,35 +142,26 @@ def checkqw():
 
 
 # 在添加每一个sheet之后，初始化字段
-def initXLS():
-    name = ['博主昵称', '博主主页', '微博认证', '微博达人', '微博内容', '发布位置', '发布时间', '微博地址', '微博来源', '转发', '评论', '赞']
+def initCSV():
+    name = ['关键词', '微博内容', '微博地址']
 
-    global row
-    global outfile
-    global sheet
+    global file_name
 
-    row = 0
-    for i in range(len(name)):
-        sheet.write(row, i, name[i])
-    row = row + 1
-    outfile.save("./微博数据.xls")   ############
+    with open(file_name, 'w', encoding='utf-8') as f:
+        f.write(','.join(name) + '\n')
 
 
 # 将dic中的内容写入excel
 def writeXLS(dic):
-    global row
-    global outfile
-    global sheet
+    global file_name
 
-    for k in dic:
-        for i in range(len(dic[k])):
-            sheet.write(row, i, dic[k][i])
-        row = row + 1
-    outfile.save("./微博数据.xls")   #############
+    with open(file_name, 'a', encoding='utf-8') as f:
+        for i in range(len(dic)):
+            f.write(','.join(dic[i]) + '\n')
 
 
 # 在页面有内容的前提下，获取内容
-def getContent():
+def getContent(key):
     # 寻找到每一条微博的class
     try:
         # nodes = driver.find_elements_by_xpath("//div[@class='WB_cardwrap S_bg2 clearfix']")
@@ -187,7 +175,7 @@ def getContent():
         input("请在微博页面输入验证码！")
         url = driver.current_url
         driver.get(url)
-        getContent()
+        getContent(key)
         return
 
     dic = {}
@@ -200,14 +188,15 @@ def getContent():
 
     for i in range(len(nodes)):
         dic[i] = []
+        dic[i].append(str(key))
         try:
             # BZNC = nodes[i].find_element_by_xpath(".//div[@class='feed_content wbcon']/a[@class='W_texta W_fb']").text
             BZNC = nodes[i].find_element_by_xpath(".//div[@class='content']/p[@class='txt']").get_attribute("nick-name")
             # print(nodes[2].find_element_by_xpath(".//div[@class='content']/p[@class='txt']").get_attribute("nick-name"))
         except:
             BZNC = ''
-        print('博主昵称:', BZNC)
-        dic[i].append(BZNC)
+        # print('博主昵称:', BZNC)
+        # dic[i].append(BZNC)
 
         try:
             BZZY = nodes[i].find_element_by_xpath(".//div[@class='content']/div[@class='info']/div[2]/a").get_attribute("href")
@@ -215,24 +204,24 @@ def getContent():
             # print(nodes[1].find_element_by_css_selector("#pl_feedlist_index > div:nth-child(2) > div:nth-child(1) > div > div.card-feed > div.avator > a").get_attribute("href"))
         except:
             BZZY = ''
-        print('博主主页:', BZZY)
-        dic[i].append(BZZY)
+        # print('博主主页:', BZZY)
+        # dic[i].append(BZZY)
         # 微博官方认证，没有爬取
         try:
             # WBRZ = nodes[i].find_element_by_xpath(".//div[@class='feed_content wbcon']/a[@class='approve_co']").get_attribute('title')#若没有认证则不存在节点
             WBRZ = nodes[i].find_element_by_xpath(".//div[@class='info']/div/a[contains(@title,'微博')]").get_attribute('title') # 若没有认证则不存在节点
         except:
             WBRZ = ''
-        print('微博认证:', WBRZ)
-        dic[i].append(WBRZ)
+        # print('微博认证:', WBRZ)
+        # dic[i].append(WBRZ)
 
         try:
             # WBDR = nodes[i].find_element_by_xpath(".//div[@class='feed_content wbcon']/a[@class='ico_club']").get_attribute('title')#若非达人则不存在节点
             WBDR = nodes[i].find_element_by_xpath(".//div[@class='feed_content wbcon']/a[@class='ico_club']").get_attribute('title')  # 若非达人则不存在节点
         except:
             WBDR = ''
-        print('微博达人:', WBDR)
-        dic[i].append(WBDR)
+        # print('微博达人:', WBDR)
+        # dic[i].append(WBDR)
 
         # 判断展开全文和网页链接是否存在
         try:
@@ -290,34 +279,34 @@ def getContent():
                     FBWZ = ''
         except:
             WBNR = ''
-        print('微博内容:', WBNR)
+        # print('微博内容:', WBNR)
         dic[i].append(WBNR)
 
-        print('发布位置:', FBWZ)
-        dic[i].append(FBWZ)
+        # print('发布位置:', FBWZ)
+        # dic[i].append(FBWZ)
 
         try:
             # FBSJ = nodes[i].find_element_by_xpath(".//div[@class='feed_from W_textb']/a[@class='W_textb']").text
             FBSJ = nodes[i].find_element_by_xpath(".//div[@class='content']/p[@class='from']/a[1]").text
         except:
             FBSJ = ''
-        print('发布时间:', FBSJ)
-        dic[i].append(FBSJ)
+        # print('发布时间:', FBSJ)
+        # dic[i].append(FBSJ)
 
         try:
             # WBDZ = nodes[i].find_element_by_xpath(".//div[@class='feed_from W_textb']/a[@class='W_textb']").get_attribute("href")
             WBDZ = nodes[i].find_element_by_xpath(".//div[@class='content']/p[@class='from']/a[1]").get_attribute("href")
         except:
             WBDZ = ''
-        print('微博地址:', WBDZ)
+        # print('微博地址:', WBDZ)
         dic[i].append(WBDZ)
 
         try:
             WBLY = nodes[i].find_element_by_xpath(".//div[@class='content']/p[@class='from']/a[2]").text
         except:
             WBLY = ''
-        print('微博来源:', WBLY)
-        dic[i].append(WBLY)
+        # print('微博来源:', WBLY)
+        # dic[i].append(WBLY)
 
         try:
             ZF_TEXT = nodes[i].find_element_by_xpath(".//a[@action-type='feed_list_forward']").text
@@ -329,8 +318,8 @@ def getContent():
                 ZF = int(ZF_TEXT.split(' ')[1])
         except:
             ZF = 0
-        print('转发:', ZF)
-        dic[i].append(ZF)
+        # print('转发:', ZF)
+        # dic[i].append(ZF)
 
         try:
             # PL_TEXT = nodes[i].find_element_by_xpath(".//a[@action-type='feed_list_comment']//em").text#可能没有em元素
@@ -342,8 +331,8 @@ def getContent():
                 PL = int(PL_TEXT.split(' ')[1])
         except:
             PL = 0
-        print('评论:', PL)
-        dic[i].append(PL)
+        # print('评论:', PL)
+        # dic[i].append(PL)
 
         try:
             ZAN_TEXT = nodes[i].find_element_by_xpath(".//a[@action-type='feed_list_like']//em").text  # 可为空
@@ -354,9 +343,9 @@ def getContent():
                 ZAN = int(ZAN_TEXT)
         except:
             ZAN = 0
-        print('赞:', ZAN)
-        dic[i].append(ZAN)
-        print('\n')
+        # print('赞:', ZAN)
+        # dic[i].append(ZAN)
+        # print('\n')
 
     # 写入Excel
     writeXLS(dic)
@@ -366,24 +355,31 @@ def getContent():
 #                                程序入口
 # *******************************************************************************
 if __name__ == '__main__':
-    # 计算关键词
-    keywords = []
-    with open("“高性能计算”重点专项2018年度项目申报指南16151950vevx.txt","r") as f:
-        text = ''
-        lines = f.readlines()
-        for line in lines:
-            text = text + line
-        text = re.sub(r'( \| cid \| : \| .* \| )', '', text)
-        keywords = jieba.analyse.extract_tags(text, topK=5)
+    all_txt = [f for f in os.listdir('./') if 'txt' in f]
+    for txt in all_txt:
+        # 计算关键词
+        keywords = []
+        with open(txt,"r", encoding='utf-8') as f:
+            text = ''
+            lines = f.readlines()
+            for line in lines:
+                text = text + line
+            text = re.sub(r'( \| cid \| : \| .* \| )', '', text)
+            keywords = jieba.analyse.extract_tags(text, topK=5)
 
-    global outfile
-    outfile = xlwt.Workbook(encoding='utf-8')
+        # global outfile
+        # outfile = xlwt.Workbook(encoding='utf-8')
+        # global sheet
+        # sheet = outfile.add_sheet('内容')
+        global file_name
+        file_name = txt.replace('txt', 'CSV')
+        initCSV()
 
-    # 定义变量
-    username = '13375921262'  # 输入你的用户名
-    password = 'VTA-a72-Rs0-9K3'  # 输入你的密码
+        # 定义变量
+        username = '13375921262'  # 输入你的用户名
+        password = 'VTA-a72-Rs0-9K3'  # 输入你的密码
 
-    # 操作函数
-    LoginWeibo(username, password)  # 登陆微博
-    for key in keywords:
-        GetSearchContent(key)
+        # 操作函数
+        LoginWeibo(username, password)  # 登陆微博
+        for key in keywords:
+            GetSearchContent(key)
