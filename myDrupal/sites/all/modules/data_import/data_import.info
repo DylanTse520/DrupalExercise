@@ -1,0 +1,12 @@
+name = Data Import
+description = Provide a page for importing crawled ebook and annotation data.
+
+dependencies[] = ebook
+dependencies[] = annotation
+
+core = 7.x
+version = 7.x-20121210
+author = Wang Xiaoli
+
+package = Example
+project = Example

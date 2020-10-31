@@ -1,0 +1,141 @@
+<?php
+
+/**
+ * @file data_import.module.
+ */
+
+/**
+ * Implementation of hook_menu()
+ */
+function data_import_menu() {
+	$items['aNewPage'] = array(
+    'title' => t('Data Import Page'),
+		'access arguments' => array('access content'),
+	 	'page callback' => 'drupal_get_form',
+    'page arguments' => array('dataImport_form'),
+		'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'main-menu',
+    'weight' => 10,
+	);
+
+	return $items;
+}
+
+/**
+ * @file data_import.module.
+ */
+
+/**
+ * Implementation of the submission form for data import
+ */
+function dataImport_form($form, &$form_state) {
+    $form = array();
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => 'Import Data'
+    );
+    return $form;
+}
+
+// @TODO 现在提交按钮后只实现了存储一本电子书和一个相关的注解
+// 需要修改此处代码实现所有爬取数据的存储
+/**
+ * Implementation of data import after submission
+ */
+function dataImport_form_submit($form, &$form_state) {
+  global $user;
+
+  $book_path = "public://data/pdf";
+  $book_list = array_values(file_scan_directory($book_path, '/.*\.pdf$/'));
+  $annotation_path = "public://data/csv";
+  $annotation_list = array_values(file_scan_directory($annotation_path, '/.*\.CSV$/'));
+  foreach ($book_list as $book) {
+    $book_name = $book->name;
+    $book_uri = $book->uri;
+
+    $node = new stdClass();
+    $node->type = 'ebook';
+    $node->status = 1;
+    $node->uid = $user->uid;
+    $node->title = t($book_name);
+    $node->promote = 1;
+    $node->sticky = 0;
+    $node->language = LANGUAGE_NONE;
+    $node->revision = NULL;
+    $node->comment = COMMENT_NODE_CLOSED;
+
+    // 将路径转化为本地文件路径
+    $pdf_path = drupal_realpath($book_uri);
+    if(!file_exists($pdf_path)){
+      drupal_set_message(t('The ebook file does not exist.'));
+      //表单重定向到书库页面
+      $form_state['redirect'] = 'myLibrary';
+      return;
+    }
+
+    // 创建一个File对象
+    $pdf_file = (object) array(
+      'uid' => $user->uid,
+      'uri' => $book_uri,
+      'filemime' => file_get_mimetype($book_uri),
+      'status' => 1,
+    );
+    // 存储文件
+    // 保存文件到相对于Drupal文件系统的根目录
+    $pdf_file = file_copy($pdf_file, "public://");
+    // 将file对象合并到节点上自定义的pdf文件字段
+    $node->book_file[LANGUAGE_NONE][0] = (array)$pdf_file;
+    $node->book_file[LANGUAGE_NONE][0]['display'] = 1;
+
+    $node = node_submit($node); // 提交前对节点进行预处理
+    node_save($node); // 调用这个函数后，可以返回新建的节点的id
+
+    foreach ($annotation_list as $annotation) {
+      if ($annotation->name == $book_name) {
+        $annotation_uri = $annotation->uri;
+        if (($handle = fopen($annotation_uri, "r")) != FALSE) {
+          while (($data = fgetcsv($handle, 0, ",")) != FALSE) {
+            $keyword = $data[0];
+            $content = $data[1];
+
+            $nodeAnnotation = new stdClass();
+            $nodeAnnotation->type = 'annotation';
+            $nodeAnnotation->status = 1;
+            $nodeAnnotation->uid = $user->uid;
+            $nodeAnnotation->title = t('Annotation');
+            $nodeAnnotation->promote = 1;
+            $nodeAnnotation->sticky = 0;
+            $nodeAnnotation->language = LANGUAGE_NONE;
+            $nodeAnnotation->revision = NULL;
+            $nodeAnnotation->comment = COMMENT_NODE_CLOSED;
+
+            $body = $content;
+            $nodeAnnotation->body[$nodeAnnotation->language][0]['value'] = check_markup($body, 'filtered_html');
+            $nodeAnnotation->body[$nodeAnnotation->language][0]['format'] = 'filtered_html';
+
+            try {
+              $nodeAnnotation = node_submit($nodeAnnotation);
+              node_save($nodeAnnotation);
+            } catch (Exception $e) {
+              continue;
+            }
+
+            $page_id = 1;
+            $highlight_keywords = $keyword;
+            db_merge('ebook_enrichments')
+            ->key(array('annotation_nid'=>$nodeAnnotation->nid))
+            ->fields(array(
+              'book_nid' => $node->nid,
+              'page_id' => $page_id,
+              'highlight_keywords' => $highlight_keywords,
+            ))
+            ->execute();
+          }
+          fclose($handle);
+        }
+      }
+    }
+  }
+
+  $form_state['redirect'] = 'myLibrary';
+}

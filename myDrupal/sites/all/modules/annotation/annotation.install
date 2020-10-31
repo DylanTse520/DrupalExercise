@@ -84,6 +84,31 @@ function annotation_schema() {
     ),
   );
 
+  $schema['ebook_enrichments'] = array(
+    'fields' => array(
+      'annotation_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'book_nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'page_id' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => NULL),
+      'highlight_keywords' => array('type' => 'text', 'not null' => FALSE, 'size' => 'big', 'serialize' => TRUE),
+    ),
+    'primary key' => array('annotation_nid'),
+    'foreign keys' => array(
+		'annotation_nid' => array(
+        	'table' => 'node',
+        	'columns' => array('annotation_nid' => 'nid'),
+		),
+		'book_nid' => array(
+        	'table' => 'node',
+        	'columns' => array('book_nid' => 'nid'),
+		),
+	),
+    'indexes' => array(
+      'book_page' => array('book_nid', 'page_id'),
+      'book_nid' => array('book_nid'),
+      'annotation_nid' => array('annotation_nid'),
+    ),
+  );
+
   return $schema;
 }
 

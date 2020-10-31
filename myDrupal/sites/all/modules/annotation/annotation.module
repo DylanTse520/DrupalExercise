@@ -63,6 +63,12 @@ function annotation_block_info() {
   );
   $blocks['annotation_postbox']['properties']['administrative'] = TRUE;
 
+  $blocks['enrichment_block'] = array (
+    'info' => t('Enrichment'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['enrichment_block']['properties']['administrative'] = TRUE;
+
   return $blocks;
 }
 
@@ -74,71 +80,61 @@ function annotation_block_view($delta = '') {
 
   $block = array();
 
+  if (!user_access('access content'))
+    return;
 
-  if ($delta == 'annotation_block') {
-      if (user_access('access content')) {
-        // Perform database queries to get annotations.
-        $query = db_select('node', 'n')->extend('PagerDefault');
-        $query->join('ebook_annotations', 'e', 'n.nid = e.annotation_nid');
-        $nids = $query
-          ->fields('n', array('nid', 'created'))
-          ->condition('n.type', 'annotation')
-          ->condition('n.status', 1)
-          ->condition('e.book_nid', arg(1))
-          ->orderBy('created', 'DESC')
-          ->limit(variable_get('default_nodes_main', 10))
-          ->addTag('node_access')
-          ->execute()
-          ->fetchCol();
+  $type = arg(0);
+  $nid = arg(1);
+  if ( $type!=='node' || !is_numeric($nid) )
+    return;
 
-        if (!empty($nids)) {
-          $build = array();
-          $nodes = node_load_multiple($nids);
-          $build += node_view_multiple($nodes, 'teaser');
-          $build['pager'] = array(
-            '#theme' => 'pager',
-            '#weight' => 5,
-          );
-          $block['subject'] = t('Annotations');
-          $block['content'] =  $build;
-        }
-    }
-  }
-  elseif ($delta == 'annotation_postbox') {
-      if (user_access('access content')) {
-        $type = arg(0);
-        $nid = arg(1);
-        if ( $type!=='node' || !is_numeric($nid) )
-          return;
-        $book = node_load($nid);
-        if ($book) {
-          // The attach info
-          $path = drupal_get_path('module', 'annotation');
-          $attached['css'][] = $path . '/css/postbox.css';
-          $attached['js'][] = $path . '/js/annotation.js';
-          $attached['js'][] = array(
-            'type' => 'setting',
-            'data' =>array(
-              'annotation' => array(
-                'timeout' => variable_get('annotation_timeout', 60),
-                'ajax_url' => url('ajax/annotation', array('absolute'=>TRUE)),
-                'annotation_bid' => $nid,
-              ),
-            )
-          );
+  $book = node_load($nid);
+  if ($book) {
+    // The attach info
+    $path = drupal_get_path('module', 'annotation');
+    $attached['css'][] = $path . '/css/postbox.css';
+    $attached['js'][] = $path . '/js/annotation.js';
+    $attached['js'][] = array(
+      'type' => 'setting',
+      'data' =>array(
+        'annotation' => array(
+          'timeout' => variable_get('annotation_timeout', 60),
+          'ajax_url' => url('ajax/annotation', array('absolute'=>TRUE)),
+          'annotation_bid' => $book->nid,
+        ),
+      )
+    );
 
-          // share image
-          $image_uploader_form = drupal_get_form('annotation_image_uploader_form');
-          $image_uploader = drupal_render($image_uploader_form);
-
-          $block['subject'] = t('Post annotations');
-          $block['content'] = array(
-            '#theme' => 'annotation_postbox_block',
-            '#attached' => $attached,
-            '#image_uploader' => isset($image_uploader) ? $image_uploader : NULL,
-          );
-        }
+    if ($delta == 'annotation_block') {
+      $type = 'annotation';
+      $build = _annotation_retrieve_annotation($type, $book->nid);
+      if (!empty($build)) {
+        $block['subject'] = t('Annotations');
+        $block['content'] =  $build;
+        $block['content']['#attached'] = $attached;
       }
+    }
+    else if($delta == 'enrichment_block') {
+      $type = 'enrichment';
+      $build = _annotation_retrieve_annotation($type, $book->nid);
+      if (!empty($build)) {
+        $block['subject'] = t('Enrichment');
+        $block['content'] =  $build;
+        $block['content']['#attached'] = $attached;
+      }
+    }
+    else if($delta == 'annotation_postbox') {
+      // share image
+      $image_uploader_form = drupal_get_form('annotation_image_uploader_form');
+      $image_uploader = drupal_render($image_uploader_form);
+
+      $block['subject'] = t('Post annotations');
+      $block['content'] = array(
+        '#theme' => 'annotation_postbox_block',
+        '#attached' => $attached,
+        '#image_uploader' => isset($image_uploader) ? $image_uploader : NULL,
+      );
+    }
   }
 
   return $block;
@@ -231,20 +227,33 @@ function annotation_ajax_callback(){
       }
       break;
     case 'getHightlight':
-      if (isset($_REQUEST['annotation_id']) && !empty($_REQUEST['annotation_id'])) {
-        // Get the annotation id
-        $annotation_id = $_REQUEST['annotation_id'];
-        if (user_access('access content')) {
-          // Perform database queries to get annotations.
-          $query = db_select('ebook_annotations', 'e')->extend('PagerDefault');
-          $nid = $query
-            ->fields('e', array('page_id', 'highlight_start', 'highlight_end'))
-            ->condition('annotation_nid', $annotation_id)
-            ->execute()
-            ->fetchObject();
+      // Add codes here to get the correct highligthing information
+      // Two types of annotations
+      if (isset($_REQUEST['type']) && !empty($_REQUEST['type'])) {
+        $type = $_REQUEST['type'];
+        if (isset($_REQUEST['annotation_id']) && !empty($_REQUEST['annotation_id'])) {
+          $annotation_id = $_REQUEST['annotation_id'];
+          if ($type == 'annotation') {
+            // Change the codes here to retrieve highlight from DB
+            $query = db_select('ebook_annotations', 'e')->extend('PagerDefault');
+            $highlight = $query
+              ->fields('e', array('page_id', 'highlight_start', 'highlight_end'))
+              ->condition('annotation_nid', $annotation_id)
+              ->execute()
+              ->fetchObject();
 
-          if (!empty($nid)) {
-            $ret = array('success' => t('Highlight get sucesssfully!'), 'highlight'=>$nid);
+            $ret = array('success' => t('Get highlight sucesssfully!'), 'highlight'=>$highlight);
+          }
+          else if ($type == 'enrichment') {
+            // Change the codes here to retrieve highlight from DB
+            $query = db_select('ebook_enrichments', 'e')->extend('PagerDefault');
+            $highlight = $query
+              ->fields('e', array('page_id', 'highlight_keywords'))
+              ->condition('annotation_nid', $annotation_id)
+              ->execute()
+              ->fetchObject();
+
+            $ret = array('success' => t('Get highlight sucesssfully!'), 'highlight'=>$highlight);
           }
         }
       }
@@ -338,4 +347,54 @@ function annotation_save_attachment_file($id) {
   }
 
   return FALSE;
+}
+
+/**
+ * retrieve annotations or enrichment contents
+ */
+function _annotation_retrieve_annotation($type, $book_id) {
+  // Perform database queries to get annotations.
+  $nids = array();
+  $query = db_select('node', 'n')->extend('PagerDefault');
+  if ($type == 'annotation') {
+    $query->join('ebook_annotations', 'e', 'e.annotation_nid=n.nid');
+    $nids = $query
+      ->fields('n', array('nid', 'created'))
+      ->fields('e', array('book_nid'))
+      ->condition('e.book_nid', $book_id)
+      ->condition('n.type', 'annotation')
+      ->condition('n.status', 1)
+      ->orderBy('n.created', 'DESC')
+      ->limit(variable_get('default_nodes_main', 10))
+      ->addTag('node_access')
+      ->execute()
+      ->fetchCol();
+  }
+  else if ($type == 'enrichment') {
+    $query->join('ebook_enrichments', 'e', 'e.annotation_nid=n.nid');
+    $nids = $query
+      ->fields('n', array('nid', 'created'))
+      ->fields('e', array('book_nid'))
+      ->condition('e.book_nid', $book_id)
+      ->condition('n.type', 'annotation')
+      ->condition('n.status', 1)
+      ->orderBy('n.created', 'DESC')
+      ->limit(variable_get('default_nodes_main', 10))
+      ->addTag('node_access')
+      ->execute()
+      ->fetchCol();
+  }
+
+
+  $build = array();
+  if (!empty($nids)) {
+    $nodes = node_load_multiple($nids);
+    $build += node_view_multiple($nodes, 'teaser');
+    $build['pager'] = array(
+      '#theme' => 'pager',
+      '#weight' => 5,
+    );
+  }
+
+  return $build;
 }

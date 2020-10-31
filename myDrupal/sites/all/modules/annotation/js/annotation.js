@@ -19,20 +19,29 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 }
 
 (function($){
-	// When the document is ready
+	// When the documet is ready
 	$(function() {
 		// Define the click action for publish button
-		// When users click the publish button, call the publish() function
-		$('#postbox .btn-publish').click(publish);
+		// When uers click the publish button, call the publish() function
+		$('#postbox #publishannotation.btn-publish').click(publish);
+
+		// Define the click action for image attaching button
+		// When uers click the image button, call the openDialog() function
+		$('.postbox .toolbar a.toolbar-btn').click(openDialog);
+
+		// Define the click action for enrich button
+		// When uers click the enrich button, call the enrich() function
+		$('#postbox #autoenrich.btn-enrich').click(function(event){
+			$('#block-annotation-annotation-block').toggle();
+			$('#block-annotation-enrichment-block').toggle();
+		});
+
 		$('#postbox .post-btn').css({"font-size":"100%", "padding":"0px 5px", "margin-right":"3px"});
 		$('#postbox .post-btn').hover(function(){
 			$(this).css({"background-color":"rgb(57, 181, 136)"});
 		},function(){
 			$(this).css({"background-color":"gray"});
 		})
-		// Define the click action for image attaching button
-		// When users click the image button, call the openDialog() function
-		$('.postbox .toolbar a.toolbar-btn').click(openDialog);
 		$('body').click(function(){
 			$('svg').remove()
 		})
@@ -77,64 +86,11 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 		});
 
 		// Add the highlighting function for a selected annotation node
-		// @TODO Define an ajax request type for retrieving the highlight information for an annotation
-		$(".node-annotation.node-teaser").hover(function(event){
-			if( $(this).hasClass('sending') ){
-				alert(Drupal.t('System is processing your request. Please wait...'));
-				return false;
-			}
-
-			// Get the annotationId from current selection node
-			var annotationId = $(this).attr('id').split('-')[1];
-			// Refer to the codes for obtaining the book page no.
-
-			if (annotationId > 0) {
-				var data = {
-					act: 'getHightlight', // Add response actions for this act
-					annotation_id: annotationId
-				};
-
-				var that = this;
-				var option = ajaxOption();
-				option = $.extend(option, {
-					data : data,
-					complete : function(){
-						$("#node-"+annotationId).removeClass('sending');
-					},
-					success : function(json) {
-	          if (json.error) {
-              ajaxError(json.error);
-	          }
-	          else if (json.success){
-							if ($('svg')) {
-								$('svg').remove();
-							};
-              addHighlight(json.highlight.page_id, json.highlight.highlight_start, json.highlight.highlight_end, 0, 0);
-
-							if (json.highlight.page_id) {
-		    				var page_container = $("#pageContainer" + json.highlight.page_id + " .textLayer");
-								if( page_container.length > 0) {
-									var focus_node = page_container.children("div").eq(json.highlight.highlight_end);
-								}
-								var line = '<path d="M ' + ($(that).offset().left) + ' ' + ($(that).offset().top + 80) + ' '
-																	+ 'L ' + (focus_node.offset().left) + ' ' + ($(that).offset().top + 80) + ' '
-																	+ 'L ' + (focus_node.offset().left) + ' ' + (focus_node.offset().top) + ' '
-																	+ '" fill="transparent" stroke="rgba(119, 118, 254, 0.5)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round""></path>';
-								var svg = '<svg version="1.1" baseProfile="full" width="' + $('#page-wrapper').width()
-													+ '" height="' + $('#page-wrapper').height()
-													+ '" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none; position: absolute; top: 0;">'
-													+ line + '</svg>';
-								$(svg).appendTo($('body'));
-							};
-	          }
-					}
-				});
-
-				$(this).addClass('sending');
-				$.ajax(option);
-			}
-
-			return false;
+		$("#block-annotation-annotation-block .node-annotation.node-teaser").hover(function(event){
+			showHighlight("annotation", this);
+		});
+		$("#block-annotation-enrichment-block .node-annotation.node-teaser").hover(function(event){
+			showHighlight("enrichment", this);
 		});
 	});
 
@@ -178,7 +134,7 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 
 		if( !dialog.is(':visible') ) {
 			var content = $('#image-dialog');
-			// Check the existence of the image upload dialog
+			// Check the existense of the image upload dialog
 			if( content.length == 0 ) {
 				content = create_image_dialog();
 				content.addClass('dialog');
@@ -271,11 +227,63 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 		return false;
 	}
 
-	// The addHighlight() function for show the highlighting texts for an annotation
-	function addHighlight(page_id, start_index, end_index, start_offset, end_offset) {
+	function showHighlight(type, that){
+
+		if( $(that).hasClass('sending') ){
+			alert(Drupal.t('System is processing your request. Please wait...'));
+			return false;
+		}
+
+		// Get the annotationId from current selection node
+		var annotationId = $(that).attr('id').split('-')[1];
+		// Refer to the codes for obtaining the book page no.
+		if (annotationId > 0) {
+			var data = {
+				act: 'getHightlight', // Add response actions for this act
+				annotation_id: annotationId,
+				type: type
+			};
+
+			var option = ajaxOption();
+			option = $.extend(option, {
+				data : data,
+				complete : function(){
+					$("#node-"+annotationId).removeClass('sending');
+				},
+				success : function(json) {
+          if (json.error) {
+            ajaxError(json.error);
+          }
+          else if (json.success){
+          	var highlight_info = json.highlight;
+          	// Add codes here to highlight texts
+          	if (type == 'annotation') {
+							if ($('svg')) {
+								$('svg').remove();
+							};
+            	addHighlight(highlight_info.page_id, highlight_info.highlight_start, highlight_info.highlight_end, 0, 0, that);
+          	}
+          	else if (type == 'enrichment') {
+          		if ($('svg')) {
+								$('svg').remove();
+							};
+          		addHighlightKeyword(highlight_info.page_id, highlight_info.highlight_keywords, that);
+          	}
+          }
+				}
+			});
+
+			$(this).addClass('sending');
+			$.ajax(option);
+		}
+
+		return false;
+	}
+
+	// The function for show the highlighting texts for an annotation
+	function addHighlight(page_id, start_index, end_index, start_offset, end_offset, that) {
 		if (start_index < 0 || end_index < 0)
 			return;
-
 		if(window.getSelection) {
 		   if (window.getSelection().empty) {
 		     window.getSelection().empty();
@@ -288,6 +296,18 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 		    if( page_container.length > 0) {
 				var anchor_node = page_container.children("div").get(start_index);
 				var focus_node = page_container.children("div").get(end_index);
+
+				var index_node = page_container.children("div").eq(end_index);
+				var line = '<path d="M ' + ($(that).offset().left) + ' ' + ($(that).offset().top + 80) + ' '
+													+ 'L ' + (index_node.offset().left - 5) + ' ' + ($(that).offset().top + 80) + ' '
+													+ 'L ' + (index_node.offset().left - 5) + ' ' + (index_node.offset().top) + ' '
+													+ '" fill="transparent" stroke="rgba(119, 118, 254, 0.5)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round""></path>';
+				var svg = '<svg version="1.1" baseProfile="full" width="' + $('#page-wrapper').width()
+									+ '" height="' + $('#page-wrapper').height()
+									+ '" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none; position: absolute; top: 0;">'
+									+ line + '</svg>';
+				$(svg).appendTo($('body'));
+
 				if (anchor_node && focus_node) {
 					var selection_element = window.getSelection();
 				    var range = document.createRange();
@@ -300,6 +320,54 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 		  document.selection.empty();
 		}
 
+		return false;
+	}
+
+	// The function for show the highlighting keywords
+	function addHighlightKeyword(page_id, keyword, that) {
+		if (keyword == null)
+			return;
+		if(window.getSelection) {
+			if (window.getSelection().empty) {
+				window.getSelection().empty();
+			} else if (window.getSelection().removeAllRanges) {  // Firefox
+				window.getSelection().removeAllRanges();
+			}
+
+	    // Show highlights
+	    var page_container = $("#pageContainer" + page_id + " .textLayer");
+	    if( page_container.length > 0) {
+	    	words = page_container.children("div");
+	    	for (var i = words.length - 1; i >= 0; i--) {
+	    		if(words[i].innerText.toLowerCase().indexOf(keyword.toLowerCase().replace(new RegExp(" ","gm"),'')) != -1) {
+		    		var anchor_node = page_container.children("div").get(i);
+						var focus_node = page_container.children("div").get(i + 1);
+		    		var index_node = page_container.children("div").eq(i);
+
+	    			var line = '<path d="M ' + ($(that).offset().left) + ' ' + ($(that).offset().top + 80) + ' '
+															+ 'L ' + (index_node.offset().left) + ' ' + ($(that).offset().top + 80) + ' '
+															+ 'L ' + (index_node.offset().left) + ' ' + (index_node.offset().top) + ' '
+															+ '" fill="transparent" stroke="rgba(119, 118, 254, 0.5)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round""></path>';
+						var svg = '<svg version="1.1" baseProfile="full" width="' + $('#page-wrapper').width()
+											+ '" height="' + $('#page-wrapper').height()
+											+ '" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none; position: absolute; top: 0;">'
+											+ line + '</svg>';
+						$(svg).appendTo($('body'));
+
+						if (anchor_node && focus_node) {
+							var selection_element = window.getSelection();
+					    var range = document.createRange();
+					    range.setStart(anchor_node, 0); // Set the default offset as 0
+					    range.setEnd(focus_node, 0); // Set the default offset as 0
+					    selection_element.addRange(range);
+						}
+						break;
+		    	}
+	    	};
+			}
+		} else if (document.selection) {  // IE @TODO
+		  document.selection.empty();
+		}
 		return false;
 	}
 
