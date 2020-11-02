@@ -25,6 +25,17 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 		// When uers click the publish button, call the publish() function
 		$('#postbox #publishannotation.btn-publish').click(publish);
 
+		$('a.read-more').css({
+			'background-color': 'mediumpurple',
+	    'color': 'white',
+	    'border': '1px solid mediumpurple',
+	    'border-radius': '10px',
+	    'padding': '0px 5px',
+	    'margin-top': '5px',
+	    'font-size': '12px',
+	    'display': 'inline-block',
+	    'float': 'right'
+	  })
 		// Define the click action for image attaching button
 		// When uers click the image button, call the openDialog() function
 		$('.postbox .toolbar a.toolbar-btn').click(openDialog);
@@ -62,6 +73,8 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
             			}
             			var start_offset = selectionRange.startOffset;
 	            		var end_offset = selectionRange.endOffset;
+	            		console.log(start_offset)
+	            		console.log(end_offset)
 	            		if (start_offset < 0)
 	            			start_offset = 0;
 	            		if (end_offset < 0)
@@ -295,6 +308,9 @@ function attach_highlight_position(page_id, start_index, end_index, start_offset
 		    var page_container = $("#pageContainer"+page_id+" .textLayer");
 		    if( page_container.length > 0) {
 				var anchor_node = page_container.children("div").get(start_index);
+				if(start_index == end_index) {
+					end_index = parseInt(end_index) + 1
+				}
 				var focus_node = page_container.children("div").get(end_index);
 
 				var index_node = page_container.children("div").eq(end_index);

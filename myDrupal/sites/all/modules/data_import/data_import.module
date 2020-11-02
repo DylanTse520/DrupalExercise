@@ -53,6 +53,15 @@ function dataImport_form_submit($form, &$form_state) {
     $book_name = $book->name;
     $book_uri = $book->uri;
 
+    // 将路径转化为本地文件路径
+    $pdf_path = drupal_realpath($book_uri);
+    if(!file_exists($pdf_path)){
+      drupal_set_message(t('The ebook file does not exist.'));
+      //表单重定向到书库页面
+      $form_state['redirect'] = 'myLibrary';
+      return;
+    }
+
     $node = new stdClass();
     $node->type = 'ebook';
     $node->status = 1;
@@ -63,15 +72,6 @@ function dataImport_form_submit($form, &$form_state) {
     $node->language = LANGUAGE_NONE;
     $node->revision = NULL;
     $node->comment = COMMENT_NODE_CLOSED;
-
-    // 将路径转化为本地文件路径
-    $pdf_path = drupal_realpath($book_uri);
-    if(!file_exists($pdf_path)){
-      drupal_set_message(t('The ebook file does not exist.'));
-      //表单重定向到书库页面
-      $form_state['redirect'] = 'myLibrary';
-      return;
-    }
 
     // 创建一个File对象
     $pdf_file = (object) array(
@@ -94,9 +94,17 @@ function dataImport_form_submit($form, &$form_state) {
       if ($annotation->name == $book_name) {
         $annotation_uri = $annotation->uri;
         if (($handle = fopen($annotation_uri, "r")) != FALSE) {
+          $count = 0;
           while (($data = fgetcsv($handle, 0, ",")) != FALSE) {
-            $keyword = $data[0];
-            $content = $data[1];
+            if ($count == 0) {
+              $count++;
+              continue;
+            }
+
+            $page_id = (int)$data[0];
+            $keyword = $data[1];
+            $content = $data[2];
+            $url = $data[3];
 
             $nodeAnnotation = new stdClass();
             $nodeAnnotation->type = 'annotation';
@@ -109,8 +117,8 @@ function dataImport_form_submit($form, &$form_state) {
             $nodeAnnotation->revision = NULL;
             $nodeAnnotation->comment = COMMENT_NODE_CLOSED;
 
-            $body = $content;
-            $nodeAnnotation->body[$nodeAnnotation->language][0]['value'] = check_markup($body, 'filtered_html');
+            $body = $content . "<a href=" . $url . " class=read-more>Read More</a>";
+            $nodeAnnotation->body[$nodeAnnotation->language][0]['value'] = check_markup($body, 'full_html');
             $nodeAnnotation->body[$nodeAnnotation->language][0]['format'] = 'filtered_html';
 
             try {
@@ -120,7 +128,6 @@ function dataImport_form_submit($form, &$form_state) {
               continue;
             }
 
-            $page_id = 1;
             $highlight_keywords = $keyword;
             db_merge('ebook_enrichments')
             ->key(array('annotation_nid'=>$nodeAnnotation->nid))

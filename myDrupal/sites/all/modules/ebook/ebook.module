@@ -27,7 +27,22 @@ function ebook_menu() {
     'menu_name' => 'user-menu',
     'weight' => -5,
   );
-
+  $items['allEBookPage'] = array(
+    'title' => t('All EBooks'),
+    'page callback' => 'all_ebook_callback',
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'main-menu',
+    'weight' => 5,
+  );
+  $items['myEBookPage'] = array(
+    'title' => t('My EBooks'),
+    'page callback' => 'my_ebook_callback',
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'main-menu',
+    'weight' => 6,
+  );
   return $items;
 }
 
@@ -60,4 +75,107 @@ function mylibrary_page_callback(){
   }
 
   return $build;
+}
+
+function all_ebook_callback(){
+  global $user;
+  $build = array();
+
+  $query = db_select('node', 'n')->extend('PagerDefault');
+  $nids = $query
+    ->fields('n', array('nid', 'title'))
+    ->condition('type', 'ebook')
+    ->condition('status', 1)
+    ->orderBy('nid', 'DESC')
+    ->addTag('node_access')
+    ->execute()
+    ->fetchCol();
+
+  if (!empty($nids)) {
+    $nodes = node_load_multiple($nids);
+    $build += node_view_multiple($nodes);
+    $build['pager'] = array(
+      '#theme' => 'pager',
+      '#weight' => 5,
+    );
+  }
+  else {
+    drupal_set_message(t('No book entries have been created.'));
+  }
+
+  return $build;
+}
+
+function my_ebook_callback(){
+  global $user;
+  $build = array();
+
+  $query = db_select('node', 'n')->extend('PagerDefault');
+  $nids = $query
+    ->fields('n', array('nid', 'title'))
+    ->condition('type', 'ebook')
+    ->condition('uid', $user->uid)
+    ->condition('status', 1)
+    ->orderBy('nid', 'DESC')
+    ->addTag('node_access')
+    ->execute()
+    ->fetchCol();
+
+  if (!empty($nids)) {
+    $nodes = node_load_multiple($nids);
+    $build += node_view_multiple($nodes);
+    $build['pager'] = array(
+      '#theme' => 'pager',
+      '#weight' => 5,
+    );
+  }
+  else {
+    drupal_set_message(t('No book entries have been created.'));
+  }
+
+  return $build;
+}
+
+function ebook_block_info() {
+  global $user;
+
+  $blocks['latest_ebook'] = array (
+    'info' => t('Latest EBooks'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  $blocks['latest_ebook']['properties']['administrative'] = TRUE;
+
+  return $blocks;
+}
+
+function ebook_block_view($delta = '') {
+  global $user;
+
+  $block = array();
+
+  if ($delta == 'latest_ebook') {
+    if (user_access('access content')) {
+
+      $query = db_select('node', 'n');
+      $nids = $query
+        ->fields('n', array('nid', 'created', 'title'))
+        ->condition('type', 'ebook')
+        ->condition('status', 1)
+        ->orderBy('created', 'DESC')
+        ->range(0, 5)
+        ->addTag('node_access')
+        ->execute()
+        ->fetchCol();
+
+      $build = array();
+      if (!empty($nids)) {
+        $nodes = node_load_multiple($nids);
+        $build += node_view_multiple($nodes, 'teaser');
+      }
+
+      $block['subject'] = t('Latest EBooks');
+      $block['content'] =  $build;
+    }
+  }
+  return $block;
 }

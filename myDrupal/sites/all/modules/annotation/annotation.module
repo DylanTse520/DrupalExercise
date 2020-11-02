@@ -23,9 +23,15 @@ function annotation_node_delete($node) {
     db_delete('ebook_annotations')
     ->condition('annotation_nid', $node->nid)
     ->execute();
+    db_delete('ebook_enrichments')
+    ->condition('annotation_nid', $node->nid)
+    ->execute();
   }
   else if($node->type == "ebook") {
     db_delete('ebook_annotations')
+    ->condition('book_nid', $node->nid)
+    ->execute();
+    db_delete('ebook_enrichments')
     ->condition('book_nid', $node->nid)
     ->execute();
   }
@@ -58,13 +64,13 @@ function annotation_block_info() {
   $blocks['annotation_block']['properties']['administrative'] = TRUE;
 
   $blocks['annotation_postbox'] = array (
-    'info' => t('Post annotaions'),
+    'info' => t('Add an Annotaion'),
     'cache' => DRUPAL_NO_CACHE,
   );
   $blocks['annotation_postbox']['properties']['administrative'] = TRUE;
 
   $blocks['enrichment_block'] = array (
-    'info' => t('Enrichment'),
+    'info' => t('Auto Annotations'),
     'cache' => DRUPAL_NO_CACHE,
   );
   $blocks['enrichment_block']['properties']['administrative'] = TRUE;
@@ -118,7 +124,7 @@ function annotation_block_view($delta = '') {
       $type = 'enrichment';
       $build = _annotation_retrieve_annotation($type, $book->nid);
       if (!empty($build)) {
-        $block['subject'] = t('Enrichment');
+        $block['subject'] = t('Auto Annotations');
         $block['content'] =  $build;
         $block['content']['#attached'] = $attached;
       }
@@ -128,7 +134,7 @@ function annotation_block_view($delta = '') {
       $image_uploader_form = drupal_get_form('annotation_image_uploader_form');
       $image_uploader = drupal_render($image_uploader_form);
 
-      $block['subject'] = t('Post annotations');
+      $block['subject'] = t('Add an Annotaion');
       $block['content'] = array(
         '#theme' => 'annotation_postbox_block',
         '#attached' => $attached,
